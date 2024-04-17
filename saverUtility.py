@@ -4,12 +4,50 @@ import base64
 import ssl
 import time
 import random
+import csv
 import paho.mqtt.client as mqtt
 from paho.mqtt.client import MQTT_ERR_SUCCESS
 from datetime import datetime
 
+###Variables Importadas InOva
+establecimiento = "Sense AI"
+propietario = "Daniel Escobar"
+
 TOPIC_ALIAS_MAX = 0
 
+def check_and_save_image(part_number, total_parts, image_data, filepath):
+    # Check if the current part is the last part
+    print("Saving part" + str(part_number) + "...")
+    if part_number >= (total_parts - 3):
+        # Check if all parts are received
+        if all(image_data): 
+            # Reconstruct the image and save it
+            image = b''.join(image_data)
+
+            # Create subfolder if it doesn't exist
+            directory = os.path.dirname(filepath)
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+
+            with open(filepath, 'wb') as f:
+                f.write(image)
+            print('Image received and saved')
+
+            # Save image_data to a CSV file ///COMENTAR O ELIMINAR
+            with open(filepath + '.csv', 'w', newline='') as f:
+                writer = csv.writer(f)
+                writer.writerow(image_data)
+            # FIN COMENTAR O ELIMINAR
+
+            # Reset image_data for next image
+            image_data = [None] * total_parts
+            filepath = None
+        else:
+            # Find and print the missing parts
+            missing_parts = [i+1 for i, part in enumerate(image_data) if part is None]
+            print(f"Missing parts: {missing_parts}")
+    return image_data, filepath
+ 
 def on_connect(client, userdata, flags, rc, properties=None):
     global TOPIC_ALIAS_MAX
     print(f"Connected to endpoint {mqtt_server} with result code {rc}")
@@ -28,7 +66,6 @@ def on_log(client, userdata, level, buf):
     print(f"Log: {buf}")
 
 def on_message(client, userdata, msg):
-    output_folder = "Fotos Reconstruidas"
     global image_data
     global filepath
     try:
@@ -40,27 +77,21 @@ def on_message(client, userdata, msg):
         if part_number == 1:
             image_data = [None] * total_parts
             serial_number = data['devInfo']['S']
+            output_folder = serial_number
             batch_number = data['devInfo']['Batch']
             foto_number = data['devInfo']['foto']
             # Construct the filename
             filename = f"{serial_number}-{batch_number}-{foto_number}.jpg"
             filepath = os.path.join(output_folder, filename)
+            print(f"Receiving image {filename} in {total_parts} parts")
 
         # Decode base64 image data
         image_part = base64.b64decode(base64_data)
 
         # Store image data in the appropriate part of the image_data list
-        image_data[part_number - 1] = image_part
+        image_data[part_number - 1] = image_part # /000111/000111-1-1.txt
 
-        # If all parts are received, reconstruct the image and save it
-        if all(image_data):
-            image = b''.join(image_data)
-            with open(filepath, 'wb') as f:
-                f.write(image)
-            print('Image received and saved')
-            # Reset image_data for next image
-            image_data = [None] * total_parts
-            filepath = None
+        image_data, filepath = check_and_save_image(part_number, total_parts, image_data, filepath)
 
     except Exception as e:
         print(f"Error processing message: {e}")

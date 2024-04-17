@@ -35,7 +35,7 @@ def publish_image(client, folder_path, filename, topic, variables_topic, foto_nu
             file_size = os.path.getsize(file_path)
             print(f"Image size: {file_size} bytes")
 
-            chunk_size = 1024*12  # Adjust chunk size as needed
+            chunk_size = 1024*2  # Adjust chunk size as needed
             total_parts = (file_size + chunk_size - 1) // chunk_size
 
             for i in range(total_parts):
@@ -67,6 +67,7 @@ def publish_image(client, folder_path, filename, topic, variables_topic, foto_nu
                     full_topic = f"{topic}/{variables_topic}"
                     client.publish(full_topic, json.dumps(json_document))
                     print(f"Published part {part_string} to MQTT topic {full_topic}")
+                    time.sleep(0.25)
 
     except Exception as e:
         print(f"Error publishing image: {e}")
@@ -133,7 +134,7 @@ for filename in os.listdir(folder_path):
         if client.is_connected():
             publish_image(client, folder_path, filename, topic, variables_topic, foto_number)
             foto_number += 1
-            time.sleep(1) # Wait between images
+            time.sleep(10) # Wait between images
         else:
             print("MQTT client is not connected")
             break
